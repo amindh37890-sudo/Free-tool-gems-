@@ -1,0 +1,6 @@
+{
+  "name": "HyperBoost AI Game Studio",
+  "description": "Smart AI-powered gaming performance booster, FPS optimizer, PC smoothness and sensitivity engine, floating HUD, and ADB developer console.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

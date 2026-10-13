@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">HyperBoost AI Game Studio</string>
+    <string name="tab_dashboard">الرئيسية</string>
+    <string name="tab_ai_gfx">رسومات AI</string>
+    <string name="tab_pc_mode">تحكم PC</string>
+    <string name="tab_overlay">النافذة العائمة</string>
+    <string name="tab_adb">أوامر ADB</string>
+</resources>
