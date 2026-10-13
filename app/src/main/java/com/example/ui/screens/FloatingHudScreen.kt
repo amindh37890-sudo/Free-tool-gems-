@@ -31,6 +31,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +61,7 @@ fun FloatingHudScreen(
     state: GameBoosterUiState,
     onToggleOverlay: () -> Unit,
     onCheckPermission: () -> Unit,
+    onExecuteShellCommand: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -224,49 +229,83 @@ fun FloatingHudScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Embedded ADB Optimizer Quick Panel
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(DarkSurface)
-                .border(1.dp, CyberCyan.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-                .padding(16.dp)
-        ) {
+        var showAdbConsole by remember { mutableStateOf(false) }
+
+        if (showAdbConsole) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Default.Bolt,
-                        contentDescription = null,
-                        tint = CyberCyan,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.size(6.dp))
-                    Text(
-                        text = "تسريع الشاشة بتردد 120Hz إجباري (ADB Fast Command)",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                Button(
+                    onClick = { showAdbConsole = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceVariant),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("← العودة للنافذة العائمة", color = CyberCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
+            AdbConsoleScreen(
+                onExecuteCommand = onExecuteShellCommand,
+                lastResult = state.lastShellExecutionResult,
+                isExecuting = state.isExecutingShellCommand
+            )
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(DarkSurface)
+                    .border(1.dp, CyberCyan.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Bolt,
+                            contentDescription = null,
+                            tint = CyberCyan,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Text(
+                            text = "كونسول أوامر المطور (ADB Optimizer)",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
 
-            Text(
-                text = "adb shell settings put system peak_refresh_rate 120.0",
-                color = ElectricGreen,
-                fontSize = 10.sp,
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-            Text(
-                text = "يجبر النظام على العمل بأعلى سلاسة ممكنة طوال جلسة اللعب بدون أي هبوط.",
-                color = Color(0xFF94A3B8),
-                fontSize = 10.sp,
-                modifier = Modifier.padding(top = 4.dp)
-            )
+                    Button(
+                        onClick = { showAdbConsole = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = CyberCyan),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(30.dp)
+                    ) {
+                        Text(text = "فتح الكونسول", color = DarkBackground, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Text(
+                    text = "adb shell settings put system peak_refresh_rate 120.0",
+                    color = ElectricGreen,
+                    fontSize = 10.sp,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                Text(
+                    text = "إلغاء خنق المعالج، إنهاء مهام الخلفية، وتثبيت 120Hz وتنفيذ الأوامر عبر الشل مباشرة.",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
         }
     }
 }

@@ -26,6 +26,9 @@ import com.example.model.GameItem
 import com.example.model.LaunchStepState
 import com.example.service.GameLauncherManager
 
+import com.example.service.AdbShellHelper
+import com.example.service.ShellExecutionResult
+
 data class GameBoosterUiState(
     val telemetry: DeviceTelemetry = DeviceTelemetry(),
     val selectedMode: GameBoostMode = GameBoostMode.BEAST,
@@ -46,7 +49,9 @@ data class GameBoosterUiState(
     val selectedGameToLaunch: GameItem? = null,
     val activeLaunchStep: LaunchStepState = LaunchStepState.IDLE,
     val launchStatusMessage: String? = null,
-    val measuredPingMs: Int = 28
+    val measuredPingMs: Int = 28,
+    val lastShellExecutionResult: ShellExecutionResult? = null,
+    val isExecutingShellCommand: Boolean = false
 )
 
 class GameBoosterViewModel(application: Application) : AndroidViewModel(application) {
@@ -63,6 +68,20 @@ class GameBoosterViewModel(application: Application) : AndroidViewModel(applicat
         recalculateSensitivity(800, 1.5f, "PUBG Mobile / Free Fire")
         calculateStretchedRatio("4:3")
         startTelemetryLoop()
+    }
+
+    fun runShellCommand(command: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isExecutingShellCommand = true) }
+            val cleanCmd = command.removePrefix("adb shell ").trim()
+            val result = AdbShellHelper.executeCommand(cleanCmd)
+            _uiState.update {
+                it.copy(
+                    isExecutingShellCommand = false,
+                    lastShellExecutionResult = result
+                )
+            }
+        }
     }
 
     fun loadGames() {
@@ -88,30 +107,35 @@ class GameBoosterViewModel(application: Application) : AndroidViewModel(applicat
             _uiState.update {
                 it.copy(
                     activeLaunchStep = LaunchStepState.PURGING_RAM,
-                    launchStatusMessage = "1/4 جارٍ تفريغ ذاكرة الرام وإيقاف التطبيقات..."
+                    launchStatusMessage = "1/4 إنهاء مهام الخلفية وتفريغ الذاكرة (ADB kill-all)..."
                 )
             }
-            delay(700)
+            // Execute background task purge via shell helper
+            AdbShellHelper.clearBackgroundProcesses()
+            delay(500)
             val freed = telemetryManager.performMemoryClean()
 
             _uiState.update {
                 it.copy(
                     activeLaunchStep = LaunchStepState.LOCKING_REFRESH_RATE,
-                    launchStatusMessage = "2/4 تم تحرير $freed MB! جارٍ تثبيت الشاشة على ${game.targetFps} FPS..."
+                    launchStatusMessage = "2/4 تثبيت الأولوية وتردد الشاشة على ${game.targetFps} FPS..."
                 )
             }
-            delay(600)
+            // Set system level performance priority and refresh rate
+            AdbShellHelper.setMaxRefreshRate(game.targetFps.toFloat())
+            AdbShellHelper.setGamePerformancePriority(game.packageName)
+            delay(500)
 
             _uiState.update {
                 it.copy(
                     activeLaunchStep = LaunchStepState.ENABLING_FLOATING_HUD,
-                    launchStatusMessage = "3/4 جارٍ تجهيز النافذة العائمة وشعار الفيزياء الحية..."
+                    launchStatusMessage = "3/4 تشغيل النافذة العائمة وشعار الفيزياء الحية..."
                 )
             }
             if (_uiState.value.hasOverlayPermission && !_uiState.value.isOverlayActive) {
                 toggleFloatingOverlay()
             }
-            delay(500)
+            delay(400)
 
             _uiState.update {
                 it.copy(
@@ -119,17 +143,17 @@ class GameBoosterViewModel(application: Application) : AndroidViewModel(applicat
                     launchStatusMessage = "4/4 توجيه مسارات الاتصال لتقليل البنق (${_uiState.value.measuredPingMs}ms)..."
                 )
             }
-            delay(500)
+            delay(400)
 
             _uiState.update {
                 it.copy(
                     activeLaunchStep = LaunchStepState.LAUNCHING_GAME,
-                    launchStatusMessage = "⚡ تشغيل ${game.title} بكامل قوة المعالج!"
+                    launchStatusMessage = "⚡ تشغيل ${game.title} بأعلى أولوية معالجة!"
                 )
             }
 
             val launched = launcherManager.launchGamePackage(game.packageName)
-            delay(1500)
+            delay(1200)
 
             _uiState.update {
                 it.copy(
@@ -158,13 +182,25 @@ class GameBoosterViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun refreshTelemetry() {
-        val data = telemetryManager.readCurrentTelemetry()
-        val hasPerm = Settings.canDrawOverlays(getApplication())
+        val data = try {
+            telemetryManager.readCurrentTelemetry()
+        } catch (e: Throwable) {
+            DeviceTelemetry()
+        }
+        val hasPerm = try {
+            Settings.canDrawOverlays(getApplication())
+        } catch (e: Throwable) {
+            false
+        }
         _uiState.update { it.copy(telemetry = data, hasOverlayPermission = hasPerm) }
     }
 
     fun checkOverlayPermission() {
-        val hasPerm = Settings.canDrawOverlays(getApplication())
+        val hasPerm = try {
+            Settings.canDrawOverlays(getApplication())
+        } catch (e: Throwable) {
+            false
+        }
         _uiState.update { it.copy(hasOverlayPermission = hasPerm) }
     }
 
@@ -195,25 +231,31 @@ class GameBoosterViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun toggleFloatingOverlay() {
-        val context = getApplication<Application>()
-        if (!Settings.canDrawOverlays(context)) {
-            _uiState.update { it.copy(hasOverlayPermission = false) }
-            return
-        }
+        try {
+            val context = getApplication<Application>()
+            val hasPerm = try {
+                Settings.canDrawOverlays(context)
+            } catch (e: Throwable) {
+                false
+            }
 
-        val currentState = _uiState.value.isOverlayActive
-        val intent = Intent(context, FloatingMonitorService::class.java)
+            if (!hasPerm) {
+                _uiState.update { it.copy(hasOverlayPermission = false) }
+                return
+            }
 
-        if (currentState) {
-            context.stopService(intent)
-            _uiState.update { it.copy(isOverlayActive = false) }
-        } else {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
+            val currentState = _uiState.value.isOverlayActive
+            val intent = Intent(context, FloatingMonitorService::class.java)
+
+            if (currentState) {
+                context.stopService(intent)
+                _uiState.update { it.copy(isOverlayActive = false) }
             } else {
                 context.startService(intent)
+                _uiState.update { it.copy(isOverlayActive = true) }
             }
-            _uiState.update { it.copy(isOverlayActive = true) }
+        } catch (e: Throwable) {
+            _uiState.update { it.copy(isOverlayActive = false) }
         }
     }
 

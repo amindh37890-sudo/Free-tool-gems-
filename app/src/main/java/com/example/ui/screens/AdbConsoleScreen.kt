@@ -42,6 +42,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
+import com.example.service.ShellExecutionResult
 import com.example.ui.theme.AlertRed
 import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.DarkBackground
@@ -62,6 +66,9 @@ data class AdbTweak(
 
 @Composable
 fun AdbConsoleScreen(
+    onExecuteCommand: (String) -> Unit = {},
+    lastResult: ShellExecutionResult? = null,
+    isExecuting: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -196,8 +203,59 @@ fun AdbConsoleScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Live Shell Execution Output Card
+        AnimatedVisibility(visible = lastResult != null || isExecuting) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 14.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(DarkBackground)
+                    .border(1.dp, if (lastResult?.success == true) ElectricGreen else CyberCyan, RoundedCornerShape(14.dp))
+                    .padding(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "TERMINAL EXECUTION LOG",
+                        color = CyberCyan,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    if (isExecuting) {
+                        CircularProgressIndicator(
+                            color = CyberCyan,
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else if (lastResult != null) {
+                        Text(
+                            text = if (lastResult.success) "STATUS: OK (0)" else "EXIT CODE: ${lastResult.exitCode}",
+                            color = if (lastResult.success) ElectricGreen else AlertRed,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                if (lastResult != null) {
+                    val logText = if (lastResult.output.isNotBlank()) lastResult.output else if (lastResult.error.isNotBlank()) lastResult.error else "Command executed successfully with no output."
+                    Text(
+                        text = logText,
+                        color = Color(0xFFE2E8F0),
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
+        }
+
         Text(
-            text = "أوامر التسريع والتحسين الجاهزة (One-Tap Copy):",
+            text = "أوامر التسريع والتحسين الجاهزة (One-Tap Copy & Run):",
             color = Color.White,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
@@ -248,7 +306,7 @@ fun AdbConsoleScreen(
                     modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
                 )
 
-                // Code block with copy button
+                // Code block with copy & run buttons
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -257,28 +315,44 @@ fun AdbConsoleScreen(
                         .border(1.dp, DarkSurfaceVariant, RoundedCornerShape(10.dp))
                         .padding(10.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Column {
                         Text(
                             text = tweak.command,
                             color = ElectricGreen,
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
                             maxLines = 2,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.fillMaxWidth()
                         )
-                        Button(
-                            onClick = { copyToClipboard(tweak.command, tweak.titleAr) },
-                            colors = ButtonDefaults.buttonColors(containerColor = CyberCyan),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(32.dp)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.End
                         ) {
-                            Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, tint = DarkBackground, modifier = Modifier.size(13.dp))
-                            Spacer(modifier = Modifier.size(4.dp))
-                            Text(text = "نسخ", color = DarkBackground, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Button(
+                                onClick = { onExecuteCommand(tweak.command) },
+                                colors = ButtonDefaults.buttonColors(containerColor = ElectricGreen),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .height(32.dp)
+                                    .padding(end = 6.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null, tint = DarkBackground, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.size(4.dp))
+                                Text(text = "تنفيذ بالشل", color = DarkBackground, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = { copyToClipboard(tweak.command, tweak.titleAr) },
+                                colors = ButtonDefaults.buttonColors(containerColor = CyberCyan),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, tint = DarkBackground, modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.size(4.dp))
+                                Text(text = "نسخ", color = DarkBackground, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }

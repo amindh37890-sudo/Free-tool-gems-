@@ -93,7 +93,7 @@ class GameLauncherManager(private val context: Context) {
             val isInstalled = try {
                 pm.getPackageInfo(game.packageName, 0)
                 true
-            } catch (e: PackageManager.NameNotFoundException) {
+            } catch (e: Throwable) {
                 false
             }
             game.copy(isInstalled = isInstalled)
@@ -108,19 +108,23 @@ class GameLauncherManager(private val context: Context) {
             }
             val elapsed = (System.currentTimeMillis() - start).toInt()
             elapsed.coerceIn(18, 120)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             28 // Default fast DNS ping
         }
     }
 
     fun launchGamePackage(packageName: String): Boolean {
-        val pm = context.packageManager
-        val launchIntent = pm.getLaunchIntentForPackage(packageName)
-        return if (launchIntent != null) {
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(launchIntent)
-            true
-        } else {
+        return try {
+            val pm = context.packageManager
+            val launchIntent = pm.getLaunchIntentForPackage(packageName)
+            if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(launchIntent)
+                true
+            } else {
+                false
+            }
+        } catch (e: Throwable) {
             false
         }
     }

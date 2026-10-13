@@ -214,7 +214,8 @@ fun MainAppScreen(viewModel: GameBoosterViewModel) {
                 AppTab.FLOATING_HUD -> FloatingHudScreen(
                     state = uiState,
                     onToggleOverlay = { viewModel.toggleFloatingOverlay() },
-                    onCheckPermission = { viewModel.checkOverlayPermission() }
+                    onCheckPermission = { viewModel.checkOverlayPermission() },
+                    onExecuteShellCommand = { viewModel.runShellCommand(it) }
                 )
             }
         }

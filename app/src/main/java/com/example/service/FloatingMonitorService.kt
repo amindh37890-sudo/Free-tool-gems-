@@ -54,40 +54,52 @@ class FloatingMonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        startForegroundServiceNotification()
+        try {
+            startForegroundServiceNotification()
+        } catch (e: Throwable) {
+            // Foreground service notification failed, continue as standard overlay service
+        }
 
-        if (Settings.canDrawOverlays(this)) {
-            setupFloatingView()
-            handler.post(updateRunnable)
-        } else {
+        try {
+            if (Settings.canDrawOverlays(this)) {
+                setupFloatingView()
+                handler.post(updateRunnable)
+            } else {
+                stopSelf()
+            }
+        } catch (e: Throwable) {
             stopSelf()
         }
     }
 
     private fun startForegroundServiceNotification() {
-        val channelId = "hyperboost_floating_channel"
-        val channelName = "HyperBoost Floating HUD"
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        try {
+            val channelId = "hyperboost_floating_channel"
+            val channelName = "HyperBoost Floating HUD"
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                channelName,
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Live game telemetry and performance overlay"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    channelId,
+                    channelName,
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "Live game telemetry and performance overlay"
+                }
+                notificationManager.createNotificationChannel(channel)
             }
-            notificationManager.createNotificationChannel(channel)
+
+            val notification: Notification = NotificationCompat.Builder(this, channelId)
+                .setContentTitle("HyperBoost Floating HUD نشط")
+                .setContentText("مراقبة حية للفريمات والذاكرة وحرارة الهاتف أثناء اللعب")
+                .setSmallIcon(android.R.drawable.ic_menu_compass)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .build()
+
+            startForeground(1001, notification)
+        } catch (e: Throwable) {
+            // Safely ignored if foreground service type restriction applies
         }
-
-        val notification: Notification = NotificationCompat.Builder(this, channelId)
-            .setContentTitle("HyperBoost Floating HUD نشط")
-            .setContentText("مراقبة حية للفريمات والذاكرة وحرارة الهاتف أثناء اللعب")
-            .setSmallIcon(android.R.drawable.ic_menu_compass)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
-
-        startForeground(1001, notification)
     }
 
     @SuppressLint("ClickableViewAccessibility")

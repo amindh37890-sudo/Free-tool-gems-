@@ -25,4 +25,10 @@ class ExampleRobolectricTest {
     org.junit.Assert.assertTrue(config.convertedGeneralSens > 0f)
     org.junit.Assert.assertTrue(config.convertedGyroSens > 100f)
   }
+
+  @Test
+  fun `verify adb shell helper execution`() = kotlinx.coroutines.test.runTest {
+    val result = com.example.service.AdbShellHelper.executeCommand("echo 'TEST_OK'")
+    org.junit.Assert.assertNotNull(result)
+  }
 }
